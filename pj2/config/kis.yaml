@@ -1,0 +1,23 @@
+# 한투 API 설정
+# https://apiportal.koreainvestment.com
+
+api:
+  base_url: "https://openapivts.koreainvestment.com:29443"  # 모의 거래
+  # base_url: "https://openapi.koreainvestment.com:9443"    # 실제 거래
+  
+  timeout: 30
+  max_retries: 3
+  
+trading:
+  account_suffix: "01"          # 계좌 번호 뒷자리 (보통 01)
+  order_type: "01"              # 01=시장가, 00=지정가
+  
+  # 리스크 관리
+  max_position_size: 100        # 최대 1개 종목 포지션 비율(%)
+  max_daily_loss: -50000        # 일일 손실 한도 (원)
+  max_loss_per_trade: -30000    # 1거래 손실 한도 (원)
+
+logging:
+  file: "logs/trade.log"
+  level: "INFO"
+  format: "%(asctime)s - %(levelname)s - %(message)s"
