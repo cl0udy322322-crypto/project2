@@ -1,0 +1,48 @@
+# 환경 및 설정
+.env
+.env.local
+.vscode/
+*.code-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# 데이터 및 로그
+logs/*.log
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# 출력
+outputs/reports/*
+outputs/trades/*
+!outputs/reports/.gitkeep
+!outputs/trades/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 기타
+*.csv
+*.xlsx
+*.db

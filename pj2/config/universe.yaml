@@ -1,0 +1,23 @@
+# 거래 대상 종목
+# 백테스트와 라이브 거래에서 동일하게 사용
+
+universe:
+  # KOSPI 200 대형주
+  - ticker: "005930"    # 삼성전자
+    name: "Samsung Electronics"
+    
+  - ticker: "051910"    # LG화학
+    name: "LG Chem"
+    
+  - ticker: "247940"    # TS인베스트먼트
+    name: "TS Investment"
+  
+  # 원하는 종목 추가
+  # - ticker: "XXXXX"
+  #   name: "Company Name"
+
+# 필터링 조건 (선택)
+filters:
+  min_market_cap: 1000000      # 최소 시가총액 (억)
+  min_volume_5d: 100000000000  # 5일 평균 거래대금 (원)
+  exclude_suspended: true      # 거래 정지 종목 제외
