@@ -23,13 +23,12 @@ class Config:
 
     # 계좌번호 (앞 8자리 + 뒤 2자리)
     CANO = "50158215"  # 계좌번호 앞 8자리
-    ACNT_PRDT_CD = "01" # 계좌번호 뒤 2자리 (보통 01)
+    ACNT_PRDT_CD = "01" # 계좌번호 뒤 2자리
 
     # 모의투자 도메인 (실전투자는 'https://openapi.koreainvestment.com:9443')
     URL_BASE = "https://openapivts.koreainvestment.com:29443"
 
-    # 총 매수할 금액 (예: 1,000만원)
-    # 실제 계좌 예수금을 조회해서 가져올 수도 있지만, 안전하게 금액을 지정하는 것을 추천합니다.
+    # 총 매수할 금액
     TOTAL_INVESTMENT_AMOUNT = 10000000
 
 # ==============================================================================
@@ -94,14 +93,14 @@ class KisApi:
         path = "uapi/domestic-stock/v1/trading/order-cash"
         url = f"{self.base_url}/{path}"
 
-        # 모의투자 매수 TR ID: VTTC0802U (실전은 TTTC0802U)
+        # 모의투자 매수 TR ID: VTTC0802U
         headers = self.get_common_headers("VTTC0802U")
 
         data = {
             "CANO": Config.CANO,
             "ACNT_PRDT_CD": Config.ACNT_PRDT_CD,
             "PDNO": code,           # 종목코드
-            "ORD_DVSN": "01",       # 주문구분 (00:지정가, 01:시장가) -> 모의투자라 시장가로 체결
+            "ORD_DVSN": "01",       # 주문구분 (00:지정가, 01:시장가)
             "ORD_QTY": str(qty),    # 주문수량
             "ORD_UNPR": "0",        # 주문단가 (시장가는 0)
         }
@@ -122,7 +121,7 @@ def run_auto_buy():
 
     # 2. CSV 파일 읽기
     try:
-        df = pd.read_csv("buy_list.csv", dtype={'code': str}) # 코드는 문자로 읽기
+        df = pd.read_csv("buy_list.csv", dtype={'code': str}) 
         print(f"\n매수 리스트 로드 완료: {len(df)}개 종목")
     except FileNotFoundError:
         print("'buy_list.csv' 파일을 찾을 수 없습니다.")
