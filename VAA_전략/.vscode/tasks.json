@@ -1,0 +1,30 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "pytest",
+			"type": "shell",
+			"command": "C:/Users/jeeho/Desktop/pj2/.venv/Scripts/python.exe",
+			"args": [
+				"-m",
+				"pytest"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "pytest",
+			"type": "shell",
+			"command": "C:/Users/jeeho/Desktop/pj2/.venv/Scripts/python.exe",
+			"args": [
+				"-m",
+				"pytest",
+				"-q"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		}
+	]
+}

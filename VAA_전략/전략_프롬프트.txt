@@ -1,0 +1,283 @@
+당신은 시니어 파이썬 퀀트 엔지니어입니다. 아래 요구사항을 100% 충족하는 VS Code용 파이썬 프로젝트를 “모듈화된 디렉토리 구조”로 생성해 주세요. 코드는 실행 가능해야 하며, 각 파일에 풍부한 주석과 타입 힌트를 달아주세요. (주석은 한국어로, 변수/함수명은 영어로)
+
+========================
+[0] 프로젝트 목표
+========================
+- 분기 리밸런싱(Quarterly rebalance) 포트폴리오 백테스트 엔진 구현
+- 신호는 월 1회 계산 (월말 기준)
+- 레짐 결정은 카나리아(BND, VWO) 기반
+- 보조지표로 VIX z-score를 사용해 “Short-covering state”를 관리
+- 공격 레짐에서는 카나리아와 동일한 가중 모멘텀(1/3/6/12M 가중)으로 종목 선별 + Risk Parity
+- 중립/방어는 “저변동성 선정 + 동일비중(1/N) 고정”으로 구성
+- Short-covering state가 ON일 때만 헷지 숏(0~20%) 허용
+- 결과로 성과지표(CAGR/Vol/Sharpe/MDD), 월별/일별 수익률, 레짐 타임라인, weights 로그를 산출하고 저장
+
+========================
+[1] 디렉토리 / 파일 구조 (반드시 이대로)
+========================
+project_root/
+  README.md
+  requirements.txt
+  pyproject.toml (선택: 있으면 좋음)
+  .gitignore
+  configs/
+    config.yaml
+  src/
+    __init__.py
+    cli.py
+    config/
+      __init__.py
+      loader.py
+    data/
+      __init__.py
+      fetch_yahoo.py
+      transforms.py
+    signals/
+      __init__.py
+      canary.py
+      vix.py
+      momentum_jt.py
+      volatility.py
+    regime/
+      __init__.py
+      state_machine.py
+      rules.py
+    portfolio/
+      __init__.py
+      risk_parity.py
+      constraints.py
+      policies.py
+      hedge.py
+    backtest/
+      __init__.py
+      engine.py
+      metrics.py
+      reporting.py
+    utils/
+      __init__.py
+      dates.py
+      logging.py
+      io.py
+  tests/
+    test_state_machine.py
+    test_risk_parity.py
+    test_constraints.py
+    test_hedge.py
+
+- 모든 import는 src 패키지 기준으로 동작해야 하므로, 실행은 `python -m src.cli ...` 형태로 가능해야 함
+- 각 모듈은 단일 책임 원칙(SRP)을 지키고, 순수함수/부작용 함수를 구분
+
+========================
+[2] 데이터 소스/처리 규칙 (필수)
+========================
+- 데이터 소스: yfinance 사용 (인터넷 연결된 환경 가정)
+- 가격: Adj Close 사용 (배당 포함)
+- VIX: ^VIX 사용
+- 거래일 인덱스는 일간(daily)로 유지, 신호 계산은 월말(month-end)로 리샘플링
+- 월말 리샘플: month-end 마지막 거래일 기준 (pandas resample('M') 후 last, 단 거래일 기준으로 안전 처리)
+- 결측/상장일이 늦은 티커: 공통 시작일 이후 결측이 있으면 해당 기간은 NaN 처리하고, 계산 가능한 구간부터만 사용 (코드에서 안전하게 처리)
+
+========================
+[3] 자산 유니버스 (고정)
+========================
+- Canary assets: BND, VWO
+- ATTACK universe: SPY, QQQ, IWM, EWJ, EEM, VGK, SOX
+- NEUTRAL universe: SPY, QQQ, TLT, LQD, GLD
+- NEUTRAL universe: SPY, QQQ, TLT, LQD, GLD
+- DEFENSE universe: GLD, DBC, LQD, TLT, HYG, UUP
+- Hedge short instrument: 무레버리지 지수 인버스 ETF 1개를 config로 받음 (기본값: SH 같은 S&P500 inverse. 다만 환경에 따라 변경 가능해야 함)
+
+========================
+[4] 카나리아 스코어 (고정, 월 1회)
+========================
+- 모멘텀스코어 정의:
+  score = (R_1M * 12) + (R_3M * 4) + (R_6M * 2) + (R_12M * 1)
+- R_kM은 “월말 가격 기준” k개월 누적수익률 (simple return)
+- alive 판단: score > 0 이면 alive(1), 아니면 0
+- alive_count = alive(BND) + alive(VWO)
+- 레짐 기본 규칙:
+  alive_count == 2 -> ATTACK
+  alive_count == 1 -> NEUTRAL
+  alive_count == 0 -> DEFENSE
+
+========================
+[5] VIX z-score / Short-covering State (일간 기반)
+========================
+- VIX z-score:
+  z = (VIX - rolling_mean) / rolling_std
+- rolling window: config로 설정 (기본값: 756 trading days ≈ 3y)
+- Short-covering 진입 조건:
+  if alive_count in {0,1} AND zVIX >= 2.0 -> short_cover_state = ON
+- Short-covering 종료 조건 (사용자 확정):
+  zVIX <= 1.5 가 연속 10 거래일 유지되면 OFF
+- 구현은 “상태 머신”으로:
+  state: OFF/ON
+  exit_streak: int
+  매 거래일 update_short_cover_state(date, alive_count, zVIX) -> (state, exit_streak)
+- 주의: short_cover_state는 레짐을 바꾸지 않음. 단지 “헷지 허용 여부”만 결정
+
+========================
+[6] 공격 레짐(ATTACK) 종목 선정 - 가중 모멘텀(월말 기반)
+========================
+- 가중 모멘텀 정의(월말 데이터):
+  score = (R_1M * 12) + (R_3M * 4) + (R_6M * 2) + (R_12M * 1)
+- ATTACK universe 7개 각각에 대해 score 계산 후 랭킹
+- 하위 2개 제거, 상위 5개를 선택
+- 선택된 자산만으로 비중 산출
+
+========================
+[7] Risk Parity (실무형: inverse-vol RP) + 제약
+========================
+- Risk Parity: inverse volatility 방식
+  w_i ∝ 1 / sigma_i
+  sigma_i는 최근 N개월(기본 12개월) 월 수익률 표준편차
+- 산출 후 sum(w)=1로 정규화
+- ATTACK 레짐 추가 제약 (사용자 확정):
+  - 선택된 각 자산 최소 보유 비중 floor = 5% (0.05)
+  - 적용 방식:
+    w = rp_weights
+    w_i = max(w_i, 0.05)
+    w = w / sum(w)
+- NEUTRAL 레짐(사용자 확정):
+  - 구성: SPY, QQQ + (DEFENSE 유니버스 중 변동성 최저 2개) + UUP
+  - 총 5개를 동일비중(1/N)으로 고정
+- DEFENSE 레짐(사용자 확정):
+  - 구성: (DEFENSE 유니버스 중 변동성 최저 2개) + UUP
+  - 총 3개를 동일비중(1/N)으로 고정
+- 저변동성 선정 규칙:
+  - sigma_i는 최근 N개월(기본 12개월) 월 수익률 표준편차
+  - 변동성 최저 2개 선정 시 UUP는 후보에서 제외(항상 별도로 포함)
+- 제약 적용 유틸: apply_floor_cap(weights: pd.Series, floor: dict|float|None, cap: dict|float|None) -> pd.Series
+
+========================
+[8] 헷지 숏 (0~20%) 규칙 (사용자 확정)
+========================
+- Short-cover_state == ON일 때만 헷지 자산(인버스 ETF)을 포트폴리오에 포함 가능
+- 헷지 비중은 기본 0%, ON이면 다음과 같이 설정:
+  - zVIX 2.0~2.5 -> hedge_w = 0.05
+  - zVIX 2.5~3.0 -> hedge_w = 0.10
+  - zVIX >= 3.0 -> hedge_w = 0.20 (상한)
+- 구현:
+  base_weights (non-hedge) 산출 후,
+  non_hedge_weights *= (1 - hedge_w)
+  hedge_weight = hedge_w
+- 추가 규칙(사용자 의도 반영): UUP는 ‘보호(hedge-available) 자산’으로 간주하여,
+  hedge 비중을 확보할 때 UUP 비중은 가능한 한 유지하고(감산 우선순위 낮춤),
+  그 외 자산(예: SPY/QQQ 등)에서 우선 감산하도록 옵션을 제공
+- Short-cover 종료되면 hedge_w=0 (다음 리밸런싱 또는 즉시 반영 방식 선택 가능)
+  - 이번 프로젝트에서는 “분기 리밸런싱에서만 weights 변경”을 원칙으로 하되,
+  - hedge는 short_cover_state 변화에 따라 “월말/분기 시점에서만 반영” 또는 “일간 즉시 반영”을 config로 선택 가능하게 해주세요.
+  - 기본값은 보수적으로: 분기 리밸런싱 시점에만 반영 (하지만 구현은 옵션 지원)
+
+========================
+[9] 리밸런싱 / 실행 규칙
+========================
+- 신호 계산: 매월 월말 기준
+- 리밸런싱 실행: 분기별 1회 (기본: 분기 첫 거래일 또는 분기말 다음 거래일을 config로 선택)
+- 포트폴리오 성과 계산은 일간으로 수행:
+  daily_ret_port = sum_i (w_i * daily_ret_i)
+- 거래 비용/슬리피지는 config로 받되, 기본값 0으로 둠
+- 로그:
+  - 각 리밸런싱 날짜의 regime, short_cover_state, selected assets, weights를 CSV로 저장
+  - 포트폴리오 일간 수익률과 누적수익률 저장
+
+========================
+[10] CLI (필수)
+========================
+- `python -m src.cli backtest --start YYYY-MM-DD --end YYYY-MM-DD --outdir outputs/run_001`
+- CLI 옵션:
+  --config configs/config.yaml
+  --start/--end
+  --rebalance_mode (quarter_start|quarter_end_next_day)
+  --plot (있으면 matplotlib로 간단히 cumulative curve 저장)
+- 실행 결과:
+  outputs/<run_id>/
+    weights.csv
+    regime_timeline.csv
+    daily_returns.csv
+    metrics.json
+    equity_curve.png (옵션)
+
+========================
+[11] README.md에 포함할 내용 (필수)
+========================
+- 설치: venv 생성, pip install -r requirements.txt
+- 실행 예시 명령어 2개
+- config.yaml 주요 파라미터 설명
+- 프로젝트 구조 설명
+
+========================
+[12] requirements.txt (필수)
+========================
+- pandas
+- numpy
+- yfinance
+- pyyaml
+- matplotlib
+- pytest
+- (선택) scipy는 사용하지 말 것 (RP는 inverse-vol로 충분)
+
+========================
+[13] 테스트 (필수, 최소 3개)
+========================
+- test_state_machine.py:
+  - zVIX <=1.5 조건 10일 연속이면 OFF 되는지
+  - zVIX >=2, alive_count 0/1이면 ON 되는지
+- test_risk_parity.py:
+  - inverse-vol weights 합 1인지, 음수 없는지
+- test_constraints.py:
+  - floor=0.05 적용 시 각 자산이 최소 5% 이상인지(선택된 자산 기준)
+
+========================
+[14] 구현 디테일 (명시)
+========================
+- 모든 함수는 입력/출력을 명확히:
+  - pandas Series/DataFrame 인덱스는 DatetimeIndex
+- logging:
+  - src/utils/logging.py에서 logger 설정
+  - 주요 단계마다 info 로그 (데이터 다운로드, 월말 변환, 리밸런싱 날짜 수, 각 레짐 분포 등)
+- 에러 처리:
+  - 데이터가 부족해 모멘텀/변동성 계산이 불가하면 해당 리밸런싱 구간은 “현금(0 return)” 또는 “직전 weights 유지” 중 config로 선택 가능 (기본: 직전 weights 유지)
+- 코드 스타일:
+  - 가독성 우선, 주석 풍부, 타입힌트 철저
+  - 함수 단위로 분리하고 과도한 클래스는 피함
+
+========================
+[15] config.yaml 기본값 예시를 꼭 작성
+========================
+- start/end 기본값은 비워도 되지만, 아래 파라미터는 포함:
+  - windows:
+      canary_lookback_months: 12
+      rp_vol_window_months: 12
+      vix_z_window_days: 756
+  - thresholds:
+      vix_entry_z: 2.0
+      vix_exit_z: 1.5
+      vix_exit_streak_days: 10
+  - selection:
+      attack_drop_bottom_n: 2
+      attack_min_weight: 0.05
+  - hedge:
+      enable: true
+      ticker: "SH"
+      z_bands:
+        - [2.0, 2.5, 0.02]
+        - [2.5, 3.0, 0.03]
+        - [3.0, 99.0, 0.05]
+      rebalance_only: true
+  - costs:
+      fee_bps: 0.0
+      slippage_bps: 0.0
+  - behavior_on_missing:
+      mode: "carry_forward"  # or "cash"
+  - rebalance:
+      mode: "quarter_start"
+
+========================
+[16] 마지막 출력
+========================
+- 위 구조/코드를 모두 생성한 뒤,
+- 핵심 파일들(특히 engine.py, policies.py, state_machine.py, cli.py)의 내용을 완성된 코드로 제공해 주세요.
+- README.md, config.yaml, requirements.txt도 함께 작성해 주세요.
+
+이제 위 요구대로 전체 프로젝트 코드를 작성해 주세요.

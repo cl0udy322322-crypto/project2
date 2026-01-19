@@ -1,0 +1,43 @@
+# 기본 설정 예시 (필수 파라미터 포함)
+
+windows:
+  canary_lookback_months: 12
+  rp_vol_window_months: 12
+  vix_z_window_days: 756
+
+thresholds:
+  vix_entry_z: 2.0
+  vix_exit_z: 1.5
+  vix_exit_streak_days: 10
+
+selection:
+  attack_drop_bottom_n: 2
+  attack_min_weight: 0.05
+  neutral_attack_tickers: ["SPY", "QQQ"]
+  low_vol_defense_n: 2
+
+hedge:
+  enable: true
+  ticker: "SH"
+  protect_tickers: ["UUP"]
+  z_bands:
+    - [2.0, 2.5, 0.05]
+    - [2.5, 3.0, 0.10]
+    - [3.0, 99.0, 0.20]
+  rebalance_only: true
+
+costs:
+  fee_bps: 0.0
+  slippage_bps: 0.0
+
+behavior_on_missing:
+  mode: "carry_forward"  # or "cash"
+
+rebalance:
+  mode: "quarter_start"  # or "quarter_end_next_day"
+
+# (옵션) yfinance 다운로드 티커 별칭
+# - 요구 유니버스는 그대로 유지하되, 야후에서 종종 실패하는 심볼을 대체 심볼로 다운로드합니다.
+# - 예: SOX(필라델피아 반도체 지수로 오해/실패 가능) -> SOXX(반도체 ETF)
+ticker_aliases:
+  SOX: "SOXX"

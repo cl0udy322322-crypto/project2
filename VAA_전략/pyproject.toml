@@ -1,0 +1,9 @@
+[project]
+name = "vaa_backtest"
+version = "0.1.0"
+description = "Quarterly rebalance backtest engine with canary regime + VIX short-covering + JT momentum + inverse-vol risk parity"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
