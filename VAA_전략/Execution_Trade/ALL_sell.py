@@ -8,6 +8,7 @@ from datetime import datetime
 # ==========================================
 # 1. 설정 및 초기화
 # ==========================================
+
 current_path = os.path.dirname(os.path.abspath(__file__))
 yaml_file = os.path.join(current_path, 'config.yaml')
 if not os.path.exists(yaml_file):
@@ -25,6 +26,7 @@ URL_BASE = "https://openapivts.koreainvestment.com:29443"
 # ==========================================
 # 2. 토큰 및 헤더 함수
 # ==========================================
+
 def get_access_token():
     token_file = os.path.join(current_path, "hantu_token.json")
     if os.path.exists(token_file):

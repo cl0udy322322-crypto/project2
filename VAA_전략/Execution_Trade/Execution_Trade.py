@@ -10,10 +10,8 @@ import time
 # ==========================================
 # 1. 설정 및 초기화
 # ==========================================
-# 현재 실행 중인 스크립트(.py)의 절대 경로를 가져옵니다.
-current_path = os.path.dirname(os.path.abspath(__file__))
 
-# 해당 경로 내의 YAML 파일명을 합칩니다. (이름이 Trade.yaml인지 config.yaml인지 꼭 확인!)
+current_path = os.path.dirname(os.path.abspath(__file__))
 yaml_file = os.path.join(current_path, 'Trade.yaml') 
 
 with open(yaml_file, encoding='UTF-8') as f:
@@ -29,6 +27,7 @@ TOTAL_CASH = 300000  # 투자 원금
 # ==========================================
 # 2. 공통 유틸리티 함수 (토큰, 헤더)
 # ==========================================
+
 def get_access_token():
     """인증 토큰 발급"""
     headers = {"content-type": "application/json"}
@@ -84,7 +83,6 @@ def order_kr_stock(token, code, qty):
     return res.json()
 
 # --- [미국 주식] ---
-# --- [미국 주식 현재가 조회 수정본] ---
 def get_us_price(token, code):
     """미국 주식 현재가 조회 (빈 문자열 에러 방지)"""
     headers = get_common_headers(token, "HHDFS00000300") # 해외주식 현재체결가
@@ -99,9 +97,8 @@ def get_us_price(token, code):
     res_json = res.json()
     
     if res_json.get('rt_cd') == '0':
-        last_price = res_json['output'].get('last', '') # 가격 필드 가져오기
+        last_price = res_json['output'].get('last', '') 
         
-        # [핵심] 가격이 비어있거나 공백인 경우 체크
         if last_price and last_price.strip() != '':
             return float(last_price)
         else:
@@ -113,10 +110,7 @@ def get_us_price(token, code):
 
 def order_us_stock(token, code, qty):
     """미국 주식 매수 주문 (지정가 - 모의투자는 시장가 제한이 있을 수 있음)"""
-    # 주의: 미국 주식 주문은 실전/모의 TR ID가 다르고 복잡합니다.
-    # 여기서는 모의투자 미국 매수(VTTT1002U) 사용
-    
-    # 현재가를 가져와서 그 가격으로 지정가 주문을 넣는 방식을 추천 (안정성)
+    # 모의투자 미국 매수(VTTT1002U) 사용
     price = get_us_price(token, code) 
     if price is None: return {"rt_cd": "1", "msg1": "현재가 조회 실패"}
 
@@ -190,7 +184,7 @@ def main():
         else:
             # === 미국 주식 로직 ===
             print(f"  -> 시장: 미국(US)")
-            # 환율 조회 로직이 필요하지만, 여기선 1달러=1400원 고정으로 단순 계산
+            # 환율
             EXCHANGE_RATE = 1400 
             current_price_usd = get_us_price(token, code)
             

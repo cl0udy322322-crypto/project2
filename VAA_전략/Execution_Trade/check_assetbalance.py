@@ -95,7 +95,7 @@ def display_total_status(token):
                     '수익률(%)': item['evlu_pfls_rt']
                 })
 
-    # --- [2] 미국 잔고 조회 (빈 리스트 에러 완벽 방어) ---
+    # --- [2] 미국 잔고 조회  ---
     us_res = requests.get(
         f"{URL_BASE}/uapi/overseas-stock/v1/trading/inquire-balance",
         headers=get_headers(token, "VTTS3012R"),
@@ -104,7 +104,6 @@ def display_total_status(token):
     
     usd_cash = '0'
     if us_res.get('rt_cd') == '0':
-        # [핵심 수정] 리스트 존재 여부와 길이를 동시에 체크
         us_summary_list = us_res.get('output2', [])
         
         if isinstance(us_summary_list, list) and len(us_summary_list) > 0:
@@ -132,7 +131,6 @@ def display_total_status(token):
     if holdings:
         print("\n [ 실시간 보유 종목 현황 ]")
         df = pd.DataFrame(holdings)
-        # 예시로 보여주신 컬럼 순서로 정렬
         cols = ['국가', '종목명', '보유수량', '매입단가', '현재가', '수익률(%)']
         df = df[cols]
         print(tabulate(df, headers='keys', tablefmt='psql', showindex=False))
