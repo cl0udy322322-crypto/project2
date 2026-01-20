@@ -1,23 +1,28 @@
+import os
 import yaml
 import pandas as pd
+from tabulate import tabulate
 import requests
 import json
 import math
 import time
 
 # ==========================================
-# 1. 설정 파일 로드 및 초기화
+# 1. 설정 및 초기화
 # ==========================================
-with open('Trade.yaml', encoding='UTF-8') as f:
+# 현재 실행 중인 스크립트(.py)의 절대 경로를 가져옵니다.
+current_path = os.path.dirname(os.path.abspath(__file__))
+
+# 해당 경로 내의 YAML 파일명을 합칩니다. (이름이 Trade.yaml인지 config.yaml인지 꼭 확인!)
+yaml_file = os.path.join(current_path, 'Trade.yaml') 
+
+with open(yaml_file, encoding='UTF-8') as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
 APP_KEY = config['hantu']['api_key']
 APP_SECRET = config['hantu']['secret_key']
-CANO = str(config['hantu']['account_id']) # 계좌번호 앞 8자리
-ACNT_PRDT_CD = "01" # 계좌번호 뒤 2자리 (보통 01 또는 00)
-HTS_ID = config['hantu']['htsid']
-
-# 모의투자 도메인
+CANO = str(config['hantu']['account_id'])
+ACNT_PRDT_CD = "01"
 URL_BASE = "https://openapivts.koreainvestment.com:29443"
 TOTAL_CASH = 10000000  # 투자 원금 (임의 설정: 1,000만원)
 
